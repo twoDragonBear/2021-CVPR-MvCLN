@@ -233,7 +233,7 @@ def main():
     torch.manual_seed(NetSeed)  # 为CPU设置随机种子
     torch.cuda.manual_seed(NetSeed)  # 为当前GPU设置随机种子
 
-    origin_train_pair_loader, train_pair_loader, all_loader, divide_seed, train_size = loader(
+    distance_train_pair_loader, train_pair_loader, all_loader, divide_seed, origin_train_label, origin_train_pairs = loader(
         args.batch_size, args.neg_prop, args.aligned_prop, args.noisy_training,
         data_name[args.data])
     if args.data == 0:
@@ -270,7 +270,8 @@ def main():
     CAR_list = []
     acc_list, nmi_list, ari_list = [], [], []
     train_time = 0
-    distance = torch.full((train_size, train_size), 1 / train_size)
+    distance = torch.full((len(origin_train_label), len(origin_train_label)),
+                          1 / len(origin_train_label))
     # train
     for i in range(0, args.epochs + 1):
         if i == 0:
@@ -278,8 +279,9 @@ def main():
                 pos_dist_mean, neg_dist_mean, false_neg_dist_mean, true_neg_dist_mean, epoch_time = train(
                     train_pair_loader, model, criterion, optimizer, i, args)
         else:
-            neg_pair_loader = load_training_data(origin_train_pair_loader,
-                                                   distance, args)
+            neg_pair_loader = load_training_data(origin_train_pairs,
+                                                 origin_train_label, distance,
+                                                 args)
             pos_dist_mean, neg_dist_mean, false_neg_dist_mean, true_neg_dist_mean, epoch_time = train(
                 neg_pair_loader, model, criterion, optimizer, i, args)
         train_time += epoch_time
@@ -305,7 +307,7 @@ def main():
         nmi_list.append(ret['kmeans']['NMI'])
         ari_list.append(ret['kmeans']['ARI'])
 
-        distance = calculate_distance(model, origin_train_pair_loader, args)
+        distance = calculate_distance(model, distance_train_pair_loader, args)
 
     # plot(acc_list, nmi_list, ari_list, CAR_list, args, data_name[args.data])
     logging.info('******** End, training time = {} s ********'.format(
