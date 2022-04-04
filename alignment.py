@@ -1,5 +1,5 @@
-import torch
 import numpy as np
+import torch
 
 
 def tiny_infer(model, device, all_loader):

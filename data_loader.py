@@ -1,9 +1,11 @@
+import random
+
 import numpy as np
+import torch
 import scipy.io as sio
 from torch.utils.data import Dataset, DataLoader
+
 from utils import TT_split, normalize
-import torch
-import random
 
 
 def load_data(dataset, neg_prop, test_prop, is_noise):

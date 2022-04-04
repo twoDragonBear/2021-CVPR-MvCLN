@@ -2,12 +2,13 @@
 Multi-view clustering and evaluation in MvCLN (CVPR2021)
 '''
 
-import numpy as np
-import sklearn.metrics as metrics
-from sklearn.cluster import KMeans
-from munkres import Munkres
 import sys
 import logging
+
+import numpy as np
+import sklearn.metrics as metrics
+from munkres import Munkres
+from sklearn.cluster import KMeans
 
 
 def Clustering(x_list, y):

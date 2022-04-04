@@ -1,17 +1,19 @@
-import argparse
-import time
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import logging
 import os
 import sys
+import time
+import logging
+import argparse
+
 import numpy as np
+import torch
+import torch.nn as nn
 import matplotlib.pyplot as plt
-from data_loader import loader
+import torch.nn.functional as F
+
 from models import *
 from alignment import tiny_infer
 from Clustering import Clustering
+from data_loader import loader
 
 parser = argparse.ArgumentParser(description='MvCLN in PyTorch')
 parser.add_argument(
