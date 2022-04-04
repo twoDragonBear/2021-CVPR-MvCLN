@@ -1,1 +1,4 @@
 .vscode/*
+log/*
+*.pyc
+*.ipynb
