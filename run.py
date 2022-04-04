@@ -14,21 +14,67 @@ from alignment import tiny_infer
 from Clustering import Clustering
 
 parser = argparse.ArgumentParser(description='MvCLN in PyTorch')
-parser.add_argument('--data', default='0', type=int,
-                    help='choice of dataset, 0-Scene15, 1-Caltech101, 2-Reuters10, 3-NoisyMNIST')
-parser.add_argument('-bs', '--batch-size', default='1024', type=int, help='number of batch size')
-parser.add_argument('-e', '--epochs', default='80', type=int, help='number of epochs to run')
-parser.add_argument('-lr', '--learn-rate', default='1e-3', type=float, help='learning rate of adam')
-parser.add_argument('-noise', '--noisy-training', type=bool, default=True,
+parser.add_argument(
+    '--data',
+    default='0',
+    type=int,
+    help='choice of dataset, 0-Scene15, 1-Caltech101, 2-Reuters10, 3-NoisyMNIST'
+)
+parser.add_argument('-bs',
+                    '--batch-size',
+                    default='1024',
+                    type=int,
+                    help='number of batch size')
+parser.add_argument('-e',
+                    '--epochs',
+                    default='80',
+                    type=int,
+                    help='number of epochs to run')
+parser.add_argument('-lr',
+                    '--learn-rate',
+                    default='1e-3',
+                    type=float,
+                    help='learning rate of adam')
+parser.add_argument('-noise',
+                    '--noisy-training',
+                    type=bool,
+                    default=True,
                     help='training with real labels or noisy labels')
-parser.add_argument('-np', '--neg-prop', default='30', type=int, help='the ratio of negative to positive pairs')
-parser.add_argument('-ap', '--aligned-prop', default='0.5', type=float,
-                    help='originally aligned proportions in the partially view-aligned data')
-parser.add_argument('-m', '--margin', default='5', type=int, help='initial margin')
-parser.add_argument('--gpu', default=0, type=int, help='GPU device idx to use.')
-parser.add_argument('-r', '--robust', default=1, type=int, help='use our robust loss or not')
-parser.add_argument('-t', '--switching-time', default=1.0, type=float, help='start fine when neg_dist>=t*margin')
-parser.add_argument('-s', '--start-fine', default=False, type=bool, help='flag to start use robust loss or not')
+parser.add_argument('-np',
+                    '--neg-prop',
+                    default='30',
+                    type=int,
+                    help='the ratio of negative to positive pairs')
+parser.add_argument(
+    '-ap',
+    '--aligned-prop',
+    default='0.5',
+    type=float,
+    help='originally aligned proportions in the partially view-aligned data')
+parser.add_argument('-m',
+                    '--margin',
+                    default='5',
+                    type=int,
+                    help='initial margin')
+parser.add_argument('--gpu',
+                    default=0,
+                    type=int,
+                    help='GPU device idx to use.')
+parser.add_argument('-r',
+                    '--robust',
+                    default=1,
+                    type=int,
+                    help='use our robust loss or not')
+parser.add_argument('-t',
+                    '--switching-time',
+                    default=1.0,
+                    type=float,
+                    help='start fine when neg_dist>=t*margin')
+parser.add_argument('-s',
+                    '--start-fine',
+                    default=False,
+                    type=bool,
+                    help='flag to start use robust loss or not')
 # mean distance of four kinds of pairs, namely, pos., neg., true neg., and false neg. (noisy labels)
 pos_dist_mean_list, neg_dist_mean_list, true_neg_dist_mean_list, false_neg_dist_mean_list = [], [], [], []
 
@@ -44,11 +90,15 @@ class NoiseRobustLoss(nn.Module):
         if use_robust_loss == 1:
             if args.start_fine:
                 loss = P * dist_sq + (1 - P) * (1 / margin) * torch.pow(
-                    torch.clamp(torch.pow(pair_dist, 0.5) * (margin - pair_dist), min=0.0), 2)
+                    torch.clamp(torch.pow(pair_dist, 0.5) *
+                                (margin - pair_dist),
+                                min=0.0), 2)
             else:
-                loss = P * dist_sq + (1 - P) * torch.pow(torch.clamp(margin - pair_dist, min=0.0), 2)
+                loss = P * dist_sq + (1 - P) * torch.pow(
+                    torch.clamp(margin - pair_dist, min=0.0), 2)
         else:
-            loss = P * dist_sq + (1 - P) * torch.pow(torch.clamp(margin - pair_dist, min=0.0), 2)
+            loss = P * dist_sq + (1 - P) * torch.pow(
+                torch.clamp(margin - pair_dist, min=0.0), 2)
         loss = torch.sum(loss) / (2.0 * N)
         return loss
 
@@ -70,21 +120,28 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
     loss_value = 0
     for batch_idx, (x0, x1, labels, real_labels) in enumerate(train_loader):
         # labels refer to noisy labels for the constructed pairs, while real_labels are the clean labels for these pairs
-        x0, x1, labels, real_labels = x0.to(args.gpu), x1.to(args.gpu), labels.to(args.gpu), real_labels.to(args.gpu)
+        x0, x1, labels, real_labels = x0.to(args.gpu), x1.to(
+            args.gpu), labels.to(args.gpu), real_labels.to(args.gpu)
         try:
-            h0, h1 = model(x0.view(x0.size()[0], -1), x1.view(x1.size()[0], -1))
+            h0, h1 = model(x0.view(x0.size()[0], -1),
+                           x1.view(x1.size()[0], -1))
         except:
             print("error raise in batch", batch_idx)
 
-        pair_dist = F.pairwise_distance(h0, h1)  # use Euclidean distance to measure similarity
+        pair_dist = F.pairwise_distance(
+            h0, h1)  # use Euclidean distance to measure similarity
         pos_dist += torch.sum(pair_dist[labels == 1])
         neg_dist += torch.sum(pair_dist[labels == 0])
-        true_neg_dist += torch.sum(pair_dist[torch.logical_and(labels == 0, real_labels == 0)])
-        false_neg_dist += torch.sum(pair_dist[torch.logical_and(labels == 0, real_labels == 1)])
+        true_neg_dist += torch.sum(pair_dist[torch.logical_and(
+            labels == 0, real_labels == 0)])
+        false_neg_dist += torch.sum(pair_dist[torch.logical_and(
+            labels == 0, real_labels == 1)])
         pos_count += len(pair_dist[labels == 1])
         neg_count += len(pair_dist[labels == 0])
-        true_neg_count += len(pair_dist[torch.logical_and(labels == 0, real_labels == 0)])
-        false_neg_count += len(pair_dist[torch.logical_and(labels == 0, real_labels == 1)])
+        true_neg_count += len(pair_dist[torch.logical_and(
+            labels == 0, real_labels == 0)])
+        false_neg_count += len(pair_dist[torch.logical_and(
+            labels == 0, real_labels == 1)])
 
         loss = criterion(pair_dist, labels, args.margin, args.robust, args)
         loss_value += loss.item()
@@ -101,8 +158,9 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
     if epoch != 0 and args.robust == 1 and neg_dist >= args.switching_time * args.margin and not args.start_fine:
         # start fine when the mean distance of neg. pairs is greater than switching_time * margin
         args.start_fine = True
-        logging.info("******* neg_dist_mean >= {} * margin, start using fine loss at epoch: {} *******".format(
-            args.switching_time, epoch + 1))
+        logging.info(
+            "******* neg_dist_mean >= {} * margin, start using fine loss at epoch: {} *******"
+            .format(args.switching_time, epoch + 1))
 
     # margin = the pos. distance + neg. distance before training
     if epoch == 0 and args.margin != 1.0:
@@ -110,14 +168,13 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
         logging.info("margin = {}".format(args.margin))
 
     if epoch % 10 == 0:
-        logging.info("distance: pos. = {}, neg. = {}, true neg. = {}, false neg. = {}".format(round(pos_dist.item(), 2),
-                                                                                              round(neg_dist.item(), 2),
-                                                                                              round(
-                                                                                                  true_neg_dist.item(),
-                                                                                                  2), round(
-                false_neg_dist.item(), 2)))
         logging.info(
-            "loss = {}, epoch_time = {} s".format(round(loss_value / len(train_loader), 2), round(epoch_time, 2)))
+            "distance: pos. = {}, neg. = {}, true neg. = {}, false neg. = {}".
+            format(round(pos_dist.item(), 2), round(neg_dist.item(), 2),
+                   round(true_neg_dist.item(), 2),
+                   round(false_neg_dist.item(), 2)))
+        logging.info("loss = {}, epoch_time = {} s".format(
+            round(loss_value / len(train_loader), 2), round(epoch_time, 2)))
 
     return pos_dist, neg_dist, false_neg_dist, true_neg_dist, epoch_time
 
@@ -126,8 +183,10 @@ def plot(acc, nmi, ari, CAR, args, data_name):
     x = range(0, args.epochs + 1, 1)
     fig_clustering = plt.figure()
     ax_clustering = fig_clustering.add_subplot(1, 1, 1)
-    ax_clustering.set_title(data_name + ", " + "Noise=" + str(args.noisy_training) + ", RobustLoss=" + str(
-        args.robust * args.switching_time) + ", neg_prop=" + str(args.neg_prop))
+    ax_clustering.set_title(data_name + ", " + "Noise=" +
+                            str(args.noisy_training) + ", RobustLoss=" +
+                            str(args.robust * args.switching_time) +
+                            ", neg_prop=" + str(args.neg_prop))
     lns1 = ax_clustering.plot(x, acc, label='acc')
     lns2 = ax_clustering.plot(x, ari, label='ari')
     lns3 = ax_clustering.plot(x, nmi, label='nmi')
@@ -141,12 +200,18 @@ def plot(acc, nmi, ari, CAR, args, data_name):
 
     fig_dist = plt.figure()
     ax_dist_mean = fig_dist.add_subplot(1, 1, 1)
-    ax_dist_mean.set_title(data_name + ", " + "Noise=" + str(args.noisy_training) + ", RobustLoss=" + str(
-        args.robust * args.switching_time) + ", neg_prop=" + str(args.neg_prop))
+    ax_dist_mean.set_title(data_name + ", " + "Noise=" +
+                           str(args.noisy_training) + ", RobustLoss=" +
+                           str(args.robust * args.switching_time) +
+                           ", neg_prop=" + str(args.neg_prop))
     lns1 = ax_dist_mean.plot(x, pos_dist_mean_list, label='pos. dist')
     lns2 = ax_dist_mean.plot(x, neg_dist_mean_list, label='neg. dist')
-    lns3 = ax_dist_mean.plot(x, false_neg_dist_mean_list, label='false neg. dist')
-    lns4 = ax_dist_mean.plot(x, true_neg_dist_mean_list, label='true neg. dist')
+    lns3 = ax_dist_mean.plot(x,
+                             false_neg_dist_mean_list,
+                             label='false neg. dist')
+    lns4 = ax_dist_mean.plot(x,
+                             true_neg_dist_mean_list,
+                             label='true neg. dist')
     lns = lns1 + lns2 + lns3 + lns4
     labs = [l.get_label() for l in lns]
     ax_dist_mean.legend(lns, labs, loc=0)
@@ -165,8 +230,9 @@ def main():
     torch.manual_seed(NetSeed)  # 为CPU设置随机种子
     torch.cuda.manual_seed(NetSeed)  # 为当前GPU设置随机种子
 
-    train_pair_loader, all_loader, divide_seed = loader(args.batch_size, args.neg_prop, args.aligned_prop,
-                                                        args.noisy_training, data_name[args.data])
+    train_pair_loader, all_loader, divide_seed = loader(
+        args.batch_size, args.neg_prop, args.aligned_prop, args.noisy_training,
+        data_name[args.data])
     if args.data == 0:
         model = MvCLNfcScene().to(args.gpu)
     elif args.data == 1:
@@ -180,20 +246,23 @@ def main():
     optimizer = torch.optim.Adam(model.parameters(), lr=args.learn_rate)
     if not os.path.exists("./log/"):
         os.mkdir("./log/")
-    path = os.path.join("./log/" + str(data_name[args.data]) + "_" + 'time=' + time.strftime('%Y-%m-%d %H:%M:%S',
-                                                                                             time.localtime(
-                                                                                                 time.time())))
+    path = os.path.join(
+        "./log/" + str(data_name[args.data]) + "_" + 'time=' +
+        time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time())))
     os.mkdir(path)
 
     log_format = '%(message)s'
-    logging.basicConfig(stream=sys.stdout, level=logging.INFO, format=log_format, datefmt='%m/%d %I:%M:%S %p')
+    logging.basicConfig(stream=sys.stdout,
+                        level=logging.INFO,
+                        format=log_format,
+                        datefmt='%m/%d %I:%M:%S %p')
     fh = logging.FileHandler(path + '.txt')
     fh.setFormatter(logging.Formatter(log_format))
     logging.getLogger().addHandler(fh)
     logging.info(
-        "******** Training begin, use RobustLoss: {}*m, use gpu {}, batch_size = {}, unaligned_prop = {}, NetSeed = {}, DivSeed = {} ********".format(
-            args.robust * args.switching_time, args.gpu, args.batch_size, (1 - args.aligned_prop), NetSeed,
-            divide_seed))
+        "******** Training begin, use RobustLoss: {}*m, use gpu {}, batch_size = {}, unaligned_prop = {}, NetSeed = {}, DivSeed = {} ********"
+        .format(args.robust * args.switching_time, args.gpu, args.batch_size,
+                (1 - args.aligned_prop), NetSeed, divide_seed))
 
     CAR_list = []
     acc_list, nmi_list, ari_list = [], [], []
@@ -205,10 +274,8 @@ def main():
                 pos_dist_mean, neg_dist_mean, false_neg_dist_mean, true_neg_dist_mean, epoch_time = train(
                     train_pair_loader, model, criterion, optimizer, i, args)
         else:
-            pos_dist_mean, neg_dist_mean, false_neg_dist_mean, true_neg_dist_mean, epoch_time = train(train_pair_loader,
-                                                                                                      model, criterion,
-                                                                                                      optimizer, i,
-                                                                                                      args)
+            pos_dist_mean, neg_dist_mean, false_neg_dist_mean, true_neg_dist_mean, epoch_time = train(
+                train_pair_loader, model, criterion, optimizer, i, args)
         train_time += epoch_time
         pos_dist_mean_list.append(pos_dist_mean.item())
         neg_dist_mean_list.append(neg_dist_mean.item())
@@ -216,7 +283,8 @@ def main():
         false_neg_dist_mean_list.append(false_neg_dist_mean.item())
 
         # test
-        v0, v1, pred_label, alignment_rate = tiny_infer(model, args.gpu, all_loader)
+        v0, v1, pred_label, alignment_rate = tiny_infer(
+            model, args.gpu, all_loader)
         CAR_list.append(alignment_rate)
         data = []
         data.append(v0)
@@ -224,15 +292,16 @@ def main():
         y_pred, ret = Clustering(data, pred_label)
         if i % 10 == 0:
             logging.info("******** testing ********")
-            logging.info(
-                "CAR={}, kmeans: acc={}, nmi={}, ari={}".format(round(alignment_rate, 4), ret['kmeans']['accuracy'],
-                                                                ret['kmeans']['NMI'], ret['kmeans']['ARI']))
+            logging.info("CAR={}, kmeans: acc={}, nmi={}, ari={}".format(
+                round(alignment_rate, 4), ret['kmeans']['accuracy'],
+                ret['kmeans']['NMI'], ret['kmeans']['ARI']))
         acc_list.append(ret['kmeans']['accuracy'])
         nmi_list.append(ret['kmeans']['NMI'])
         ari_list.append(ret['kmeans']['ARI'])
 
     # plot(acc_list, nmi_list, ari_list, CAR_list, args, data_name[args.data])
-    logging.info('******** End, training time = {} s ********'.format(round(train_time, 2)))
+    logging.info('******** End, training time = {} s ********'.format(
+        round(train_time, 2)))
 
 
 if __name__ == '__main__':

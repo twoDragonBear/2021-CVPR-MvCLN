@@ -10,7 +10,8 @@ def tiny_infer(model, device, all_loader):
     len_alldata = len(all_loader.dataset)
     align_labels = torch.zeros(len_alldata)
     with torch.no_grad():
-        for batch_idx, (x0, x1, labels, class_labels0, class_labels1) in enumerate(all_loader):
+        for batch_idx, (x0, x1, labels, class_labels0,
+                        class_labels1) in enumerate(all_loader):
             test_num = len(labels)
 
             x0, x1, labels = x0.to(device), x1.to(device), labels.to(device)
@@ -32,7 +33,8 @@ def tiny_infer(model, device, all_loader):
     count = torch.sum(align_labels)
     inference_acc = count.item() / len_alldata
 
-    return np.array(align_out0), np.array(align_out1), np.array(class_labels_cluster), inference_acc
+    return np.array(align_out0), np.array(align_out1), np.array(
+        class_labels_cluster), inference_acc
 
 
 def euclidean_dist(x, y):

@@ -20,8 +20,10 @@ def load_data(dataset, neg_prop, test_prop, is_noise):
         label = np.squeeze(mat['Y'])
     elif dataset == 'Reuters_dim10':
         data = []  # 18758 samples
-        data.append(normalize(np.vstack((mat['x_train'][0], mat['x_test'][0]))))
-        data.append(normalize(np.vstack((mat['x_train'][1], mat['x_test'][1]))))
+        data.append(normalize(np.vstack(
+            (mat['x_train'][0], mat['x_test'][0]))))
+        data.append(normalize(np.vstack(
+            (mat['x_train'][1], mat['x_test'][1]))))
         label = np.squeeze(np.hstack((mat['y_train'], mat['y_test'])))
     elif dataset == 'NoisyMNIST-30000':
         data = []
@@ -32,7 +34,8 @@ def load_data(dataset, neg_prop, test_prop, is_noise):
     divide_seed = random.randint(1, 1000)  #
     train_idx, test_idx = TT_split(len(label), test_prop, divide_seed)
     train_label, test_label = label[train_idx], label[test_idx]
-    train_X, train_Y, test_X, test_Y = data[0][train_idx], data[1][train_idx], data[0][test_idx], data[1][test_idx]
+    train_X, train_Y, test_X, test_Y = data[0][train_idx], data[1][
+        train_idx], data[0][test_idx], data[1][test_idx]
 
     # Use test_prop*sizeof(all data) to train the MvCLN, and shuffle the rest data to simulate the unaligned data.
     # Note that, MvCLN establishes the correspondence of the all data rather than the unaligned portion in the testing.
@@ -52,19 +55,25 @@ def load_data(dataset, neg_prop, test_prop, is_noise):
         all_label, all_label_X, all_label_Y = train_label, train_label, train_label
 
     # pair construction. view 0 and 1 refer to pairs constructed for training. noisy and real labels refer to 0/1 label of those pairs
-    view0, view1, noisy_labels, real_labels, _, _ = get_pairs(train_X, train_Y, neg_prop, train_label)
+    view0, view1, noisy_labels, real_labels, _, _ = get_pairs(
+        train_X, train_Y, neg_prop, train_label)
 
     count = 0
     for i in range(len(noisy_labels)):
         if noisy_labels[i] != real_labels[i]:
             count += 1
-    print('noise rate of the constructed neg. pairs is ', round(count / (len(noisy_labels) - len(train_X)), 2))
+    print('noise rate of the constructed neg. pairs is ',
+          round(count / (len(noisy_labels) - len(train_X)), 2))
 
     if is_noise == 0:  # training with real_labels, v/t with real_labels
-        print("----------------------Training with real_labels----------------------")
+        print(
+            "----------------------Training with real_labels----------------------"
+        )
         train_pair_labels = real_labels
     else:  # training with labels, v/t with real_labels
-        print("----------------------Training with noisy_labels----------------------")
+        print(
+            "----------------------Training with noisy_labels----------------------"
+        )
         train_pair_labels = noisy_labels
     train_pairs.append(view0.T)
     train_pairs.append(view1.T)
@@ -100,8 +109,11 @@ def get_pairs(train_X, train_Y, neg_prop, train_label):
 
     labels = np.array(labels, dtype=np.int64)
     real_labels = np.array(real_labels, dtype=np.int64)
-    class_labels0, class_labels1 = np.array(class_labels0, dtype=np.int64), np.array(class_labels1, dtype=np.int64)
-    view0, view1 = np.array(view0, dtype=np.float32), np.array(view1, dtype=np.float32)
+    class_labels0, class_labels1 = np.array(
+        class_labels0, dtype=np.int64), np.array(class_labels1, dtype=np.int64)
+    view0, view1 = np.array(view0,
+                            dtype=np.float32), np.array(view1,
+                                                        dtype=np.float32)
     return view0, view1, labels, real_labels, class_labels0, class_labels1
 
 
@@ -112,7 +124,9 @@ class GetDataset(Dataset):
         self.real_labels = real_labels
 
     def __getitem__(self, index):
-        fea0, fea1 = torch.from_numpy(self.data[0][:, index]).float(), torch.from_numpy(self.data[1][:, index]).float()
+        fea0, fea1 = torch.from_numpy(
+            self.data[0][:, index]).float(), torch.from_numpy(
+                self.data[1][:, index]).float()
         fea0, fea1 = fea0.unsqueeze(0), fea1.unsqueeze(0)
         label = np.int64(self.labels[index])
         if len(self.real_labels) == 0:
@@ -132,7 +146,9 @@ class GetAllDataset(Dataset):
         self.class_labels1 = class_labels1
 
     def __getitem__(self, index):
-        fea0, fea1 = torch.from_numpy(self.data[0][:, index]).float(), torch.from_numpy(self.data[1][:, index]).float()
+        fea0, fea1 = torch.from_numpy(
+            self.data[0][:, index]).float(), torch.from_numpy(
+                self.data[1][:, index]).float()
         fea0, fea1 = fea0.unsqueeze(0), fea1.unsqueeze(0)
         label = np.int64(self.labels[index])
         class_labels0 = np.int64(self.class_labels0[index])
@@ -154,18 +170,13 @@ def loader(train_bs, neg_prop, test_prop, is_noise, dataset):
     """
     train_pairs, train_pair_labels, train_pair_real_labels, all_data, all_label, all_label_X, all_label_Y, \
     divide_seed = load_data(dataset, neg_prop, test_prop, is_noise)
-    train_pair_dataset = GetDataset(train_pairs, train_pair_labels, train_pair_real_labels)
+    train_pair_dataset = GetDataset(train_pairs, train_pair_labels,
+                                    train_pair_real_labels)
     all_dataset = GetAllDataset(all_data, all_label, all_label_X, all_label_Y)
 
-    train_pair_loader = DataLoader(
-        train_pair_dataset,
-        batch_size=train_bs,
-        shuffle=True,
-        drop_last=True
-    )
-    all_loader = DataLoader(
-        all_dataset,
-        batch_size=1024,
-        shuffle=True
-    )
+    train_pair_loader = DataLoader(train_pair_dataset,
+                                   batch_size=train_bs,
+                                   shuffle=True,
+                                   drop_last=True)
+    all_loader = DataLoader(all_dataset, batch_size=1024, shuffle=True)
     return train_pair_loader, all_loader, divide_seed
