@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import torch.nn.functional as F
 from loguru import logger
 
-from utils import calculate_distance
+from utils import calculate_distance, init_logger
 from models import *
 from alignment import tiny_infer
 from Clustering import Clustering
@@ -104,6 +104,7 @@ class NoiseRobustLoss(nn.Module):
                 torch.clamp(margin - pair_dist, min=0.0), 2)
         loss = torch.sum(loss) / (2.0 * N)
         return loss
+
 
 def train(train_loader, model, criterion, optimizer, epoch, args):
     pos_dist = 0  # mean distance of pos. pairs
