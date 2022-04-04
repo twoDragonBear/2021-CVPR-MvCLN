@@ -222,18 +222,13 @@ def load_training_data(origin_train_pairs, origin_train_label, distance, args):
     for i in range(len(noisy_labels)):
         if noisy_labels[i] != real_labels[i]:
             count += 1
-    print('noise rate of the constructed neg. pairs is ',
-          round(count / (len(noisy_labels) - len(train_X)), 2))
+    logging.info(
+        f'noise rate of the constructed neg. pairs is {round(count / (len(noisy_labels) - len(train_X)), 2)}'
+    )
 
     if args.noisy_training == 0:  # training with real_labels, v/t with real_labels
-        print(
-            "----------------------Training with real_labels----------------------"
-        )
         train_pair_labels = real_labels
     else:  # training with labels, v/t with real_labels
-        print(
-            "----------------------Training with noisy_labels----------------------"
-        )
         train_pair_labels = noisy_labels
     train_pairs.append(view0.T)
     train_pairs.append(view1.T)
@@ -267,6 +262,7 @@ def generate_neg_pairs(train_X, train_Y, neg_prop, train_label, distance):
                                    size=neg_prop,
                                    replace=False,
                                    p=distance[j].numpy())
+        logging.info(neg_idx)
         for k in range(neg_prop):
             view0.append(train_X[j])
             view1.append(train_Y[neg_idx[k]])
