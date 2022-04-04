@@ -10,10 +10,11 @@ import torch.nn as nn
 import matplotlib.pyplot as plt
 import torch.nn.functional as F
 
+from utils import calculate_distance
 from models import *
 from alignment import tiny_infer
 from Clustering import Clustering
-from data_loader import loader
+from data_loader import loader, load_training_data
 
 parser = argparse.ArgumentParser(description='MvCLN in PyTorch')
 parser.add_argument(
@@ -59,8 +60,8 @@ parser.add_argument('-m',
                     type=int,
                     help='initial margin')
 parser.add_argument('--gpu',
-                    default=0,
-                    type=int,
+                    default='cpu',
+                    type=str,
                     help='GPU device idx to use.')
 parser.add_argument('-r',
                     '--robust',
@@ -232,7 +233,7 @@ def main():
     torch.manual_seed(NetSeed)  # 为CPU设置随机种子
     torch.cuda.manual_seed(NetSeed)  # 为当前GPU设置随机种子
 
-    train_pair_loader, all_loader, divide_seed = loader(
+    origin_train_pair_loader, train_pair_loader, all_loader, divide_seed, train_size = loader(
         args.batch_size, args.neg_prop, args.aligned_prop, args.noisy_training,
         data_name[args.data])
     if args.data == 0:
@@ -269,6 +270,7 @@ def main():
     CAR_list = []
     acc_list, nmi_list, ari_list = [], [], []
     train_time = 0
+    distance = torch.full((train_size, train_size), 1 / train_size)
     # train
     for i in range(0, args.epochs + 1):
         if i == 0:
@@ -276,8 +278,10 @@ def main():
                 pos_dist_mean, neg_dist_mean, false_neg_dist_mean, true_neg_dist_mean, epoch_time = train(
                     train_pair_loader, model, criterion, optimizer, i, args)
         else:
+            neg_pair_loader = load_training_data(origin_train_pair_loader,
+                                                   distance, args)
             pos_dist_mean, neg_dist_mean, false_neg_dist_mean, true_neg_dist_mean, epoch_time = train(
-                train_pair_loader, model, criterion, optimizer, i, args)
+                neg_pair_loader, model, criterion, optimizer, i, args)
         train_time += epoch_time
         pos_dist_mean_list.append(pos_dist_mean.item())
         neg_dist_mean_list.append(neg_dist_mean.item())
@@ -300,6 +304,8 @@ def main():
         acc_list.append(ret['kmeans']['accuracy'])
         nmi_list.append(ret['kmeans']['NMI'])
         ari_list.append(ret['kmeans']['ARI'])
+
+        distance = calculate_distance(model, origin_train_pair_loader, args)
 
     # plot(acc_list, nmi_list, ari_list, CAR_list, args, data_name[args.data])
     logging.info('******** End, training time = {} s ********'.format(

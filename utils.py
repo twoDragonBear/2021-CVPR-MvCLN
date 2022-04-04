@@ -91,17 +91,13 @@ def knn(data, label, test_prop, k):
 
 
 def calculate_distance(model, train_pair_loader, args):
-    logging.info('start calculate distance')
-
     model.eval()
     distance_0 = []
     distance_1 = []
     with torch.no_grad():
-        for _, (x0, x1, labels, real_labels) in enumerate(train_pair_loader):
-            # logging.info(f'train data:{batch_idx},{x0},{x1},{labels},{real_labels}')
-            # labels refer to noisy labels for the constructed pairs, while real_labels are the clean labels for these pairs
-            x0, x1, labels, real_labels = x0.to(args.gpu), x1.to(
-                args.gpu), labels.to(args.gpu), real_labels.to(args.gpu)
+        for _, (x0, x1, labels) in enumerate(train_pair_loader):
+            x0, x1, labels = x0.to(args.gpu), x1.to(args.gpu), labels.to(
+                args.gpu)
 
             h0, h1 = model(x0.view(x0.size()[0], -1),
                            x1.view(x1.size()[0], -1))
@@ -113,7 +109,5 @@ def calculate_distance(model, train_pair_loader, args):
 
     C = euclidean_dist(distance_0, distance_1)
     C = torch.softmax(C, 1)
-
-    logging.info('end calculate distance')
 
     return C

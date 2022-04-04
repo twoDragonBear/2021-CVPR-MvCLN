@@ -1,4 +1,5 @@
 import random
+import logging
 
 import numpy as np
 import torch
@@ -11,6 +12,7 @@ from utils import TT_split, normalize
 def load_data(dataset, neg_prop, test_prop, is_noise):
     all_data = []
     train_pairs = []
+    origin_train_pairs = []
     label = []
 
     mat = sio.loadmat('./datasets/' + dataset + '.mat')
@@ -38,6 +40,9 @@ def load_data(dataset, neg_prop, test_prop, is_noise):
     train_label, test_label = label[train_idx], label[test_idx]
     train_X, train_Y, test_X, test_Y = data[0][train_idx], data[1][
         train_idx], data[0][test_idx], data[1][test_idx]
+
+    origin_train_pairs.append(train_X.T)
+    origin_train_pairs.append(train_Y.T)
 
     # Use test_prop*sizeof(all data) to train the MvCLN, and shuffle the rest data to simulate the unaligned data.
     # Note that, MvCLN establishes the correspondence of the all data rather than the unaligned portion in the testing.
@@ -81,7 +86,7 @@ def load_data(dataset, neg_prop, test_prop, is_noise):
     train_pairs.append(view1.T)
     train_pair_real_labels = real_labels
 
-    return train_pairs, train_pair_labels, train_pair_real_labels, all_data, all_label, all_label_X, all_label_Y, divide_seed
+    return train_pairs, train_pair_labels, train_pair_real_labels, all_data, all_label, all_label_X, all_label_Y, divide_seed, origin_train_pairs, train_label
 
 
 def get_pairs(train_X, train_Y, neg_prop, train_label):
@@ -117,6 +122,23 @@ def get_pairs(train_X, train_Y, neg_prop, train_label):
                             dtype=np.float32), np.array(view1,
                                                         dtype=np.float32)
     return view0, view1, labels, real_labels, class_labels0, class_labels1
+
+
+class GetOriginDataSet(Dataset):
+    def __init__(self, data, labels):
+        self.data = data
+        self.labels = labels
+
+    def __getitem__(self, index):
+        fea0, fea1 = torch.from_numpy(
+            self.data[0][:, index]).float(), torch.from_numpy(
+                self.data[1][:, index]).float()
+        fea0, fea1 = fea0.unsqueeze(0), fea1.unsqueeze(0)
+        label = np.int64(self.labels[index])
+        return fea0, fea1, label
+
+    def __len__(self):
+        return len(self.labels)
 
 
 class GetDataset(Dataset):
@@ -171,14 +193,108 @@ def loader(train_bs, neg_prop, test_prop, is_noise, dataset):
     :return: train_pair_loader including the constructed pos. and neg. pairs used for training MvCLN, all_loader including originally aligned and unaligned data used for testing MvCLN
     """
     train_pairs, train_pair_labels, train_pair_real_labels, all_data, all_label, all_label_X, all_label_Y, \
-    divide_seed = load_data(dataset, neg_prop, test_prop, is_noise)
+    divide_seed, origin_train_pairs, origin_train_label = load_data(dataset, neg_prop, test_prop, is_noise)
+    origin_train_pair_dataset = GetOriginDataSet(origin_train_pairs,
+                                                 origin_train_label)
     train_pair_dataset = GetDataset(train_pairs, train_pair_labels,
                                     train_pair_real_labels)
     all_dataset = GetAllDataset(all_data, all_label, all_label_X, all_label_Y)
 
+    origin_train_pair_loader = DataLoader(origin_train_pair_dataset,
+                                          batch_size=train_bs)
     train_pair_loader = DataLoader(train_pair_dataset,
                                    batch_size=train_bs,
                                    shuffle=True,
                                    drop_last=True)
     all_loader = DataLoader(all_dataset, batch_size=1024, shuffle=True)
-    return train_pair_loader, all_loader, divide_seed
+    return origin_train_pair_loader, train_pair_loader, all_loader, divide_seed, len(
+        origin_train_label)
+
+
+def load_training_data(train_data_loader, distance, args):
+    train_pairs = []
+    train_X = []
+    train_Y = []
+    train_label = []
+    with torch.no_grad():
+        for _, (x0, x1, labels) in enumerate(train_data_loader):
+            # labels refer to noisy labels for the constructed pairs, while real_labels are the clean labels for these pairs
+            x0, x1, labels = x0.to(args.gpu), x1.to(args.gpu), labels.to(
+                args.gpu)
+
+            train_X.append(x0)
+            train_Y.append(x1)
+            train_label.append(labels)
+    train_X = torch.cat(train_X)
+    train_Y = torch.cat(train_Y)
+    train_label = torch.cat(train_label)
+
+    view0, view1, noisy_labels, real_labels, _, _ = generate_neg_pairs(
+        train_X, train_Y, args.neg_prop, train_label, distance)
+
+    count = 0
+    for i in range(len(noisy_labels)):
+        if noisy_labels[i] != real_labels[i]:
+            count += 1
+    print('noise rate of the constructed neg. pairs is ',
+          round(count / (len(noisy_labels) - len(train_X)), 2))
+
+    if args.noisy_training == 0:  # training with real_labels, v/t with real_labels
+        print(
+            "----------------------Training with real_labels----------------------"
+        )
+        train_pair_labels = real_labels
+    else:  # training with labels, v/t with real_labels
+        print(
+            "----------------------Training with noisy_labels----------------------"
+        )
+        train_pair_labels = noisy_labels
+    train_pairs.append(view0.T)
+    train_pairs.append(view1.T)
+    train_pair_real_labels = real_labels
+
+    train_pair_dataset = GetDataset(train_pairs, train_pair_labels,
+                                    train_pair_real_labels)
+
+    train_pair_loader = DataLoader(train_pair_dataset,
+                                   batch_size=1024,
+                                   shuffle=True,
+                                   drop_last=True)
+
+    return train_pair_loader
+
+
+def generate_neg_pairs(train_X, train_Y, neg_prop, train_label, distance):
+    view0, view1, labels, real_labels, class_labels0, class_labels1 = [], [], [], [], [], []
+    # construct pos. pairs
+    for i in range(len(train_X)):
+        view0.append(train_X[i])
+        view1.append(train_Y[i])
+        labels.append(1)
+        real_labels.append(1)
+        class_labels0.append(train_label[i])
+        class_labels1.append(train_label[i])
+    # construct neg. pairs by taking each sample in view0 as an anchor and randomly sample neg_prop samples from view1,
+    # which may lead to the so called noisy labels, namely, some of the constructed neg. pairs may in the same category.
+    for j in range(len(train_X)):
+        neg_idx = np.random.choice([i for i in range(len(train_X))],
+                                   size=neg_prop,
+                                   replace=False,
+                                   p=distance[j].numpy())
+        for k in range(neg_prop):
+            view0.append(train_X[j])
+            view1.append(train_Y[neg_idx[k]])
+            labels.append(0)
+            class_labels0.append(train_label[j])
+            class_labels1.append(train_label[neg_idx[k]])
+            if train_label[j] != train_label[neg_idx[k]]:
+                real_labels.append(0)
+            else:
+                real_labels.append(1)
+
+    labels = np.array(labels, dtype=np.int64)
+    real_labels = np.array(real_labels, dtype=np.int64)
+    class_labels0, class_labels1 = np.array(
+        class_labels0, dtype=np.int64), np.array(class_labels1, dtype=np.int64)
+    view0,view1 = np.array([i.squeeze().numpy() for i in view0], dtype=np.float32),np.array([i.squeeze().numpy() for i in view1], dtype=np.float32)
+    return view0, view1, labels, real_labels, class_labels0, class_labels1
