@@ -1,3 +1,4 @@
+import torch
 import random
 import logging
 
@@ -6,9 +7,12 @@ from sklearn import svm
 from sklearn.metrics import accuracy_score
 from sklearn.neighbors import KNeighborsClassifier
 
+from alignment import euclidean_dist
+
 
 def normalize(x):
-    x = (x-np.tile(np.min(x, axis=0), (x.shape[0], 1))) / np.tile((np.max(x, axis=0)-np.min(x, axis=0)), (x.shape[0], 1))
+    x = (x - np.tile(np.min(x, axis=0), (x.shape[0], 1))) / np.tile(
+        (np.max(x, axis=0) - np.min(x, axis=0)), (x.shape[0], 1))
     return x
 
 
@@ -26,7 +30,7 @@ def TT_split(n_all, test_prop, seed):
     '''
     random.seed(seed)
     random_idx = random.sample(range(n_all), n_all)
-    train_num = np.ceil((1-test_prop) * n_all).astype(np.int)
+    train_num = np.ceil((1 - test_prop) * n_all).astype(np.int)
     train_idx = random_idx[0:train_num]
     test_num = np.floor(test_prop * n_all).astype(np.int)
     test_idx = random_idx[-test_num:]
@@ -38,12 +42,15 @@ def initLogging(logFilename):
     LOG_FORMAT = "%(asctime)s\tFile \"%(filename)s\",LINE %(lineno)-4d : %(levelname)-8s %(message)s"
     # 日期格式化方式
     DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
-    logging.basicConfig(filename=logFilename, level=logging.DEBUG, format=LOG_FORMAT, datefmt=DATE_FORMAT)
-    formatter = logging.Formatter(LOG_FORMAT);
-    console = logging.StreamHandler();
-    console.setLevel(logging.INFO);
-    console.setFormatter(formatter);
-    logging.getLogger('').addHandler(console);
+    logging.basicConfig(filename=logFilename,
+                        level=logging.DEBUG,
+                        format=LOG_FORMAT,
+                        datefmt=DATE_FORMAT)
+    formatter = logging.Formatter(LOG_FORMAT)
+    console = logging.StreamHandler()
+    console.setLevel(logging.INFO)
+    console.setFormatter(formatter)
+    logging.getLogger('').addHandler(console)
 
 
 def svm_classify(data, label, test_prop, C):
@@ -53,7 +60,8 @@ def svm_classify(data, label, test_prop, C):
     """
     seed = random.randint(0, 1000)
     train_idx, test_idx = TT_split(data.shape[1], test_prop, seed)
-    train_data = np.concatenate([data[0][train_idx], data[1][train_idx]], axis=1)
+    train_data = np.concatenate([data[0][train_idx], data[1][train_idx]],
+                                axis=1)
     test_data = np.concatenate([data[0][test_idx], data[1][test_idx]], axis=1)
     test_label = label[test_idx]
     train_label = label[train_idx]
@@ -69,7 +77,8 @@ def svm_classify(data, label, test_prop, C):
 def knn(data, label, test_prop, k):
     seed = random.randint(0, 1000)
     train_idx, test_idx = TT_split(data.shape[1], test_prop, seed)
-    train_data = np.concatenate([data[0][train_idx], data[1][train_idx]], axis=1)
+    train_data = np.concatenate([data[0][train_idx], data[1][train_idx]],
+                                axis=1)
     test_data = np.concatenate([data[0][test_idx], data[1][test_idx]], axis=1)
     test_label = label[test_idx]
     train_label = label[train_idx]
@@ -81,3 +90,30 @@ def knn(data, label, test_prop, k):
     return test_acc
 
 
+def calculate_distance(model, train_pair_loader, args):
+    logging.info('start calculate distance')
+
+    model.eval()
+    distance_0 = []
+    distance_1 = []
+    with torch.no_grad():
+        for _, (x0, x1, labels, real_labels) in enumerate(train_pair_loader):
+            # logging.info(f'train data:{batch_idx},{x0},{x1},{labels},{real_labels}')
+            # labels refer to noisy labels for the constructed pairs, while real_labels are the clean labels for these pairs
+            x0, x1, labels, real_labels = x0.to(args.gpu), x1.to(
+                args.gpu), labels.to(args.gpu), real_labels.to(args.gpu)
+
+            h0, h1 = model(x0.view(x0.size()[0], -1),
+                           x1.view(x1.size()[0], -1))
+            distance_0.append(h0)
+            distance_1.append(h1)
+
+    distance_0 = torch.cat(distance_0)
+    distance_1 = torch.cat(distance_1)
+
+    C = euclidean_dist(distance_0, distance_1)
+    C = torch.softmax(C, 1)
+
+    logging.info('end calculate distance')
+
+    return C
