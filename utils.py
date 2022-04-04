@@ -1,8 +1,10 @@
-import torch
+import os
+import imp
 import random
-import logging
 
 import numpy as np
+import torch
+from loguru import logger
 from sklearn import svm
 from sklearn.metrics import accuracy_score
 from sklearn.neighbors import KNeighborsClassifier
@@ -37,20 +39,15 @@ def TT_split(n_all, test_prop, seed):
     return train_idx, test_idx
 
 
-def initLogging(logFilename):
-    # 日志格式化方式
-    LOG_FORMAT = "%(asctime)s\tFile \"%(filename)s\",LINE %(lineno)-4d : %(levelname)-8s %(message)s"
-    # 日期格式化方式
-    DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
-    logging.basicConfig(filename=logFilename,
-                        level=logging.DEBUG,
-                        format=LOG_FORMAT,
-                        datefmt=DATE_FORMAT)
-    formatter = logging.Formatter(LOG_FORMAT)
-    console = logging.StreamHandler()
-    console.setLevel(logging.INFO)
-    console.setFormatter(formatter)
-    logging.getLogger('').addHandler(console)
+def init_logger():
+    log_dir = os.path.dirname(os.path.realpath(__file__))
+    logger.info(log_dir)
+    logger.add("%s/log/%s" % (log_dir, 'MvCLN.log'),
+               rotation='16MB',
+               encoding='utf-8',
+               enqueue=True,
+               retention='10 days')
+    logger.info("Logging initialized.")
 
 
 def svm_classify(data, label, test_prop, C):

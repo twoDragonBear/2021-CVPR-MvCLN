@@ -1,7 +1,6 @@
 import os
 import sys
 import time
-import logging
 import argparse
 
 import numpy as np
@@ -9,6 +8,7 @@ import torch
 import torch.nn as nn
 import matplotlib.pyplot as plt
 import torch.nn.functional as F
+from loguru import logger
 
 from utils import calculate_distance
 from models import *
@@ -105,7 +105,6 @@ class NoiseRobustLoss(nn.Module):
         loss = torch.sum(loss) / (2.0 * N)
         return loss
 
-
 def train(train_loader, model, criterion, optimizer, epoch, args):
     pos_dist = 0  # mean distance of pos. pairs
     neg_dist = 0
@@ -117,7 +116,7 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
     true_neg_count = 0
 
     if epoch % 10 == 0:
-        logging.info("=======> Train epoch: {}/{}".format(epoch, args.epochs))
+        logger.info("=======> Train epoch: {}/{}".format(epoch, args.epochs))
     model.train()
     time0 = time.time()
     loss_value = 0
@@ -161,22 +160,22 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
     if epoch != 0 and args.robust == 1 and neg_dist >= args.switching_time * args.margin and not args.start_fine:
         # start fine when the mean distance of neg. pairs is greater than switching_time * margin
         args.start_fine = True
-        logging.info(
+        logger.info(
             "******* neg_dist_mean >= {} * margin, start using fine loss at epoch: {} *******"
             .format(args.switching_time, epoch + 1))
 
     # margin = the pos. distance + neg. distance before training
     if epoch == 0 and args.margin != 1.0:
         args.margin = max(1, round((pos_dist + neg_dist).item()))
-        logging.info("margin = {}".format(args.margin))
+        logger.info("margin = {}".format(args.margin))
 
     if epoch % 10 == 0:
-        logging.info(
+        logger.info(
             "distance: pos. = {}, neg. = {}, true neg. = {}, false neg. = {}".
             format(round(pos_dist.item(), 2), round(neg_dist.item(), 2),
                    round(true_neg_dist.item(), 2),
                    round(false_neg_dist.item(), 2)))
-        logging.info("loss = {}, epoch_time = {} s".format(
+        logger.info("loss = {}, epoch_time = {} s".format(
             round(loss_value / len(train_loader), 2), round(epoch_time, 2)))
 
     return pos_dist, neg_dist, false_neg_dist, true_neg_dist, epoch_time
@@ -233,6 +232,8 @@ def main():
     torch.manual_seed(NetSeed)  # 为CPU设置随机种子
     torch.cuda.manual_seed(NetSeed)  # 为当前GPU设置随机种子
 
+    init_logger()
+
     distance_train_pair_loader, train_pair_loader, all_loader, divide_seed, origin_train_label, origin_train_pairs = loader(
         args.batch_size, args.neg_prop, args.aligned_prop, args.noisy_training,
         data_name[args.data])
@@ -247,25 +248,6 @@ def main():
 
     criterion = NoiseRobustLoss().to(args.gpu)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.learn_rate)
-    if not os.path.exists("./log/"):
-        os.mkdir("./log/")
-    path = os.path.join(
-        "./log/" + str(data_name[args.data]) + "_" + 'time=' +
-        time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time())))
-    os.mkdir(path)
-
-    log_format = '%(message)s'
-    logging.basicConfig(stream=sys.stdout,
-                        level=logging.INFO,
-                        format=log_format,
-                        datefmt='%m/%d %I:%M:%S %p')
-    fh = logging.FileHandler(path + '.txt')
-    fh.setFormatter(logging.Formatter(log_format))
-    logging.getLogger().addHandler(fh)
-    logging.info(
-        "******** Training begin, use RobustLoss: {}*m, use gpu {}, batch_size = {}, unaligned_prop = {}, NetSeed = {}, DivSeed = {} ********"
-        .format(args.robust * args.switching_time, args.gpu, args.batch_size,
-                (1 - args.aligned_prop), NetSeed, divide_seed))
 
     CAR_list = []
     acc_list, nmi_list, ari_list = [], [], []
@@ -299,8 +281,8 @@ def main():
         data.append(v1)
         y_pred, ret = Clustering(data, pred_label)
         if i % 10 == 0:
-            logging.info("******** testing ********")
-            logging.info("CAR={}, kmeans: acc={}, nmi={}, ari={}".format(
+            logger.info("******** testing ********")
+            logger.info("CAR={}, kmeans: acc={}, nmi={}, ari={}".format(
                 round(alignment_rate, 4), ret['kmeans']['accuracy'],
                 ret['kmeans']['NMI'], ret['kmeans']['ARI']))
         acc_list.append(ret['kmeans']['accuracy'])
@@ -310,7 +292,7 @@ def main():
         distance = calculate_distance(model, distance_train_pair_loader, args)
 
     # plot(acc_list, nmi_list, ari_list, CAR_list, args, data_name[args.data])
-    logging.info('******** End, training time = {} s ********'.format(
+    logger.info('******** End, training time = {} s ********'.format(
         round(train_time, 2)))
 
 

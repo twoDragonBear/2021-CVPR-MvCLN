@@ -3,10 +3,10 @@ Multi-view clustering and evaluation in MvCLN (CVPR2021)
 '''
 
 import sys
-import logging
 
 import numpy as np
 import sklearn.metrics as metrics
+from loguru import logger
 from munkres import Munkres
 from sklearn.cluster import KMeans
 
@@ -104,7 +104,7 @@ def classification_metric(y_true,
     if verbose:
         # print('Confusion Matrix')
         # print(confusion_matrix)
-        logging.info(
+        logger.info(
             'accuracy: {}, precision: {}, recall: {}, f_measure: {}'.format(
                 accuracy, precision, recall, f_score))
     return {
@@ -132,7 +132,7 @@ def clustering_metric(y_true, y_pred, n_clusters, verbose=False, decimals=4):
     ari = np.round(ari, decimals)
 
     if verbose:
-        logging.info('AMI: {}, NMI: {}, ARI: {}'.format(ami, nmi, ari))
+        logger.info('AMI: {}, NMI: {}, ARI: {}'.format(ami, nmi, ari))
     return dict({
         'AMI': ami,
         'NMI': nmi,

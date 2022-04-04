@@ -1,9 +1,10 @@
+import imp
 import random
-import logging
 
 import numpy as np
 import torch
 import scipy.io as sio
+from loguru import logger
 from torch.utils.data import Dataset, DataLoader
 
 from utils import TT_split, normalize
@@ -73,7 +74,7 @@ def load_data(dataset, neg_prop, test_prop, is_noise):
     for i in range(len(noisy_labels)):
         if noisy_labels[i] != real_labels[i]:
             count += 1
-    logging.info(
+    logger.info(
         f'noise rate of the constructed neg. pairs is {round(count / (len(noisy_labels) - len(train_X)), 2)}'
     )
 
@@ -222,7 +223,7 @@ def load_training_data(origin_train_pairs, origin_train_label, distance, args):
     for i in range(len(noisy_labels)):
         if noisy_labels[i] != real_labels[i]:
             count += 1
-    logging.info(
+    logger.info(
         f'noise rate of the constructed neg. pairs is {round(count / (len(noisy_labels) - len(train_X)), 2)}'
     )
 
@@ -262,7 +263,6 @@ def generate_neg_pairs(train_X, train_Y, neg_prop, train_label, distance):
                                    size=neg_prop,
                                    replace=False,
                                    p=distance[j].numpy())
-        logging.info(neg_idx)
         for k in range(neg_prop):
             view0.append(train_X[j])
             view1.append(train_Y[neg_idx[k]])
