@@ -249,6 +249,10 @@ def main():
 
     criterion = NoiseRobustLoss().to(args.gpu)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.learn_rate)
+    logger.info(
+        "******** Training begin, use RobustLoss: {}*m, use gpu {}, batch_size = {}, unaligned_prop = {}, NetSeed = {}, DivSeed = {} ********"
+        .format(args.robust * args.switching_time, args.gpu, args.batch_size,
+                (1 - args.aligned_prop), NetSeed, divide_seed))
 
     CAR_list = []
     acc_list, nmi_list, ari_list = [], [], []
@@ -261,10 +265,13 @@ def main():
             with torch.no_grad():
                 pos_dist_mean, neg_dist_mean, false_neg_dist_mean, true_neg_dist_mean, epoch_time = train(
                     train_pair_loader, model, criterion, optimizer, i, args)
-        else:
+        elif i <= 10:
             neg_pair_loader = load_training_data(origin_train_pairs,
                                                  origin_train_label, distance,
                                                  args)
+            pos_dist_mean, neg_dist_mean, false_neg_dist_mean, true_neg_dist_mean, epoch_time = train(
+                neg_pair_loader, model, criterion, optimizer, i, args)
+        else:
             pos_dist_mean, neg_dist_mean, false_neg_dist_mean, true_neg_dist_mean, epoch_time = train(
                 neg_pair_loader, model, criterion, optimizer, i, args)
         train_time += epoch_time
@@ -289,8 +296,8 @@ def main():
         acc_list.append(ret['kmeans']['accuracy'])
         nmi_list.append(ret['kmeans']['NMI'])
         ari_list.append(ret['kmeans']['ARI'])
-
-        distance = calculate_distance(model, distance_train_pair_loader, args)
+        if i<=10:
+            distance = calculate_distance(model, distance_train_pair_loader, args)
 
     # plot(acc_list, nmi_list, ari_list, CAR_list, args, data_name[args.data])
     logger.info('******** End, training time = {} s ********'.format(

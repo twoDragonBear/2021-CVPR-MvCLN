@@ -2,3 +2,5 @@
 log/*
 *.pyc
 *.ipynb
+*.log
+*.out

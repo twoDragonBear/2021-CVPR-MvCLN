@@ -1,4 +1,3 @@
-import imp
 import random
 
 import numpy as np
@@ -75,12 +74,14 @@ def load_data(dataset, neg_prop, test_prop, is_noise):
         if noisy_labels[i] != real_labels[i]:
             count += 1
     logger.info(
-        f'noise rate of the constructed neg. pairs is {round(count / (len(noisy_labels) - len(train_X)), 2)}'
+        f'noise rate of the constructed neg. pairs is {round(count / (len(noisy_labels) - len(train_X)), 4)}'
     )
 
     if is_noise == 0:  # training with real_labels, v/t with real_labels
+        logger.info("----------------------Training with real_labels----------------------")
         train_pair_labels = real_labels
     else:  # training with labels, v/t with real_labels
+        logger.info("----------------------Training with noisy_labels----------------------")
         train_pair_labels = noisy_labels
     train_pairs.append(view0.T)
     train_pairs.append(view1.T)
@@ -224,7 +225,7 @@ def load_training_data(origin_train_pairs, origin_train_label, distance, args):
         if noisy_labels[i] != real_labels[i]:
             count += 1
     logger.info(
-        f'noise rate of the constructed neg. pairs is {round(count / (len(noisy_labels) - len(train_X)), 2)}'
+        f'noise rate of the constructed neg. pairs is {round(count / (len(noisy_labels) - len(train_X)), 4)}'
     )
 
     if args.noisy_training == 0:  # training with real_labels, v/t with real_labels
@@ -259,10 +260,16 @@ def generate_neg_pairs(train_X, train_Y, neg_prop, train_label, distance):
     # construct neg. pairs by taking each sample in view0 as an anchor and randomly sample neg_prop samples from view1,
     # which may lead to the so called noisy labels, namely, some of the constructed neg. pairs may in the same category.
     for j in range(len(train_X)):
+        # value, index = torch.sort(distance[j], descending=True)
+        # top_value = torch.softmax(value[:1000], -1)
+        # neg_idx = np.random.choice(index[:1000],
+        #                            size=neg_prop,
+        #                            replace=False,
+        #                            p=top_value.numpy())
         neg_idx = np.random.choice([i for i in range(len(train_X))],
-                                   size=neg_prop,
-                                   replace=False,
-                                   p=distance[j].numpy())
+                                size=neg_prop,
+                                replace=False,
+                                p=distance[j].cpu().numpy())
         for k in range(neg_prop):
             view0.append(train_X[j])
             view1.append(train_Y[neg_idx[k]])
