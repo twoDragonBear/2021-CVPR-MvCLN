@@ -265,12 +265,11 @@ def main():
             with torch.no_grad():
                 pos_dist_mean, neg_dist_mean, false_neg_dist_mean, true_neg_dist_mean, epoch_time = train(
                     train_pair_loader, model, criterion, optimizer, i, args)
-        elif i <= 10:
-            neg_pair_loader = load_training_data(origin_train_pairs,
-                                                 origin_train_label, distance,
-                                                 args)
-            pos_dist_mean, neg_dist_mean, false_neg_dist_mean, true_neg_dist_mean, epoch_time = train(
-                neg_pair_loader, model, criterion, optimizer, i, args)
+                distance = calculate_distance(model,
+                                              distance_train_pair_loader, args)
+                neg_pair_loader = load_training_data(origin_train_pairs,
+                                                     origin_train_label,
+                                                     distance, args)
         else:
             pos_dist_mean, neg_dist_mean, false_neg_dist_mean, true_neg_dist_mean, epoch_time = train(
                 neg_pair_loader, model, criterion, optimizer, i, args)
@@ -296,8 +295,6 @@ def main():
         acc_list.append(ret['kmeans']['accuracy'])
         nmi_list.append(ret['kmeans']['NMI'])
         ari_list.append(ret['kmeans']['ARI'])
-        if i<=10:
-            distance = calculate_distance(model, distance_train_pair_loader, args)
 
     # plot(acc_list, nmi_list, ari_list, CAR_list, args, data_name[args.data])
     logger.info('******** End, training time = {} s ********'.format(
